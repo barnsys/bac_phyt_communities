@@ -1,0 +1,107 @@
+library(vegan)
+
+#function to calculate the average value in the column
+
+colSdColMeans <- function(x, na.rm=TRUE) {
+  if (na.rm) {
+    n <- colSums(!is.na(x)) # thanks @flodel
+  } else {
+    n <- nrow(x)
+  }
+  colVar <- colMeans(x*x, na.rm=na.rm) - (colMeans(x, na.rm=na.rm))^2
+  return(sqrt(colVar * n/(n-1)))
+}
+
+#function to calculate the standard deviation in a column
+
+colSd<- function(x)sqrt(rowMeans((t(x)-colMeans(x))^2)*((dim(x)[1])/(dim(x)[1]-1)))
+
+
+data<-read.table("data_mds.txt",header=TRUE,sep="\t")
+
+rownames(data)<-data[,1]
+data<-data[,-1]
+
+point_labels<-paste(data$point, data$zone, data$coast, sep="_")
+
+#data array of responsible variables
+
+Resp<-data[,c(21:30)]
+for(i in 1:ncol(Resp))
+ {
+  x<-mean(Resp[,i], na.rm=TRUE)
+  Resp[is.na(Resp[,i]),i]<-x
+ }
+
+col_m<-colMeans(Resp)
+col_sd<-colSd(Resp)
+c_var<-rep(0, ncol(Resp))
+names(c_var)<-colnames(Resp)
+for(i in 1:ncol(Resp)) c_var[i]<-col_sd[i]/col_m[i]
+c_var
+
+#data array of explorativ variables
+
+Expl<-data[,c(6:20)]
+for(i in 3:ncol(Expl))
+ {
+  x<-mean(Expl[,i], na.rm=TRUE)
+  Expl[is.na(Expl[,i]),i]<-x
+ }
+
+col_m<-colMeans(Expl)
+col_sd<-colSd(Expl)
+c_var<-rep(0, ncol(Expl))
+names(c_var)<-colnames(Expl)
+for(i in 1:ncol(Expl)) c_var[i]<-col_sd[i]/col_m[i]
+c_var
+
+#average normalization
+
+
+for(i in 1:ncol(Resp)) Resp[,i]<-Resp[,i]/mean(Resp[,i])
+
+for(i in 1:ncol(Expl)) Expl[,i]<-Expl[,i]/mean(Expl[,i])
+
+#////////////////NMDS for biological parameters
+
+ord<-metaMDS(Resp, distance = "euclidean")
+
+plot(ord, typ="n")
+
+points(ord, display="sites", pch=1, lwd=3.5, cex = 3.2, col="red", select=which(data$coast=="e" & data$zone=="r"))
+points(ord, display="sites", pch=0, lwd=3.5, cex = 3.2, col="red", select=which(data$coast=="e" & data$zone=="u"))
+points(ord, display="sites", pch=1, lwd=3.5, cex = 3.2, col="blue", select=which(data$coast=="w" & data$zone=="r"))
+points(ord, display="sites", pch=0, lwd=3.5, cex = 3.2, col="blue", select=which(data$coast=="w" & data$zone=="u"))
+points(ord, display="sites", pch=1, lwd=3.5, cex = 3.2, col="green", select=which(data$coast=="p"))
+text(ord, display = "sites", labels=data$biotop ,cex=1, col="blue", select=which(data$biotop=="i"))
+text(ord, display = "sites", labels=data$biotop ,cex=1, col="black", select=which(data$biotop=="w"))
+
+Expl_main<-cbind(Expl, data[,2:5])
+
+ord.fit<-envfit(ord ~ Na+K+Ca+Mg+HCO3+C.CO2.+Cl+N.NO2.+N.NO3.+S.SO4.+N.NH4.+P.PO4.+Si+COD+рН+place+zone+coast+biotop, data=Expl_main, perm=10000)
+ord.fit
+
+plot(ord.fit)
+
+
+#////////////////NMDS for hydrochemical parameters
+
+ord<-metaMDS(Expl, distance = "euclidean")
+
+plot(ord, typ="n")
+
+points(ord, display="sites", pch=1, lwd=3.5, cex = 3.2, col="red", select=which(data$coast=="e" & data$zone=="r"))
+points(ord, display="sites", pch=0, lwd=3.5, cex = 3.2, col="red", select=which(data$coast=="e" & data$zone=="u"))
+points(ord, display="sites", pch=1, lwd=3.5, cex = 3.2, col="blue", select=which(data$coast=="w" & data$zone=="r"))
+points(ord, display="sites", pch=0, lwd=3.5, cex = 3.2, col="blue", select=which(data$coast=="w" & data$zone=="u"))
+points(ord, display="sites", pch=1, lwd=3.5, cex = 3.2, col="green", select=which(data$coast=="p"))
+text(ord, display = "sites", labels=data$biotop ,cex=1, col="blue", select=which(data$biotop=="i"))
+text(ord, display = "sites", labels=data$biotop ,cex=1, col="black", select=which(data$biotop=="w"))
+
+Resp_main<-cbind(Resp, data[,2:5])
+
+ord.fit<-envfit(ord ~ Corg+Bio_phyto+chloroph_a+Sum_PP+BOD+NB+OB+TMC22C+TMC37C+Sum_BP+place+zone+coast+biotop, data=Resp_main, perm=1000)
+ord.fit
+
+plot(ord.fit)
